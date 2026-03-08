@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Conversacional STM32</title>
+
+<style>
+body{
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#141E30,#243B55);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  margin:0;
+}
+
+.container{
+  background:white;
+  width:720px;
+  padding:30px;
+  border-radius:20px;
+  box-shadow:0 25px 60px rgba(0,0,0,0.5);
+}
+
+h2{
+  text-align:center;
+  color:#243B55;
+}
+
+textarea{
+  width:100%;
+  height:120px;
+  padding:12px;
+  border-radius:12px;
+  border:2px solid #ddd;
+  font-size:16px;
+  resize:none;
+}
+
+textarea:focus{
+  border-color:#243B55;
+  outline:none;
+}
+
+.buttons{
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+
+button{
+  flex:1;
+  padding:12px;
+  border:none;
+  border-radius:12px;
+  font-weight:bold;
+  cursor:pointer;
+  color:white;
+  transition:0.3s;
+}
+
+#btn-speak{background:#4CAF50;}
+#btn-mic{background:#673AB7;}
+#btn-stop{background:#f44336;}
+#btn-exit{background:#ff9800;}
+#btn-reset{background:#009688;}
+
+button:hover{
+  transform:translateY(-3px);
+  opacity:0.9;
+}
+
+#output-area{
+  margin-top:15px;
+  padding:15px;
+  background:#f4f6fa;
+  border-radius:12px;
+  min-height:70px;
+  font-size:14px;
+  line-height:1.6;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>🤖 Sistema Conversacional STM32</h2>
+
+<textarea id="input-area" placeholder="Di 'Sistema' para iniciar..."></textarea>
+
+<div class="buttons">
+<button id="btn-speak" onclick="processText()">▶ Reproducir</button>
+<button id="btn-mic" onclick="startListening()">🎤 Hablar</button>
+<button id="btn-stop" onclick="stopSpeech()">⏹ Detener</button>
+<button id="btn-exit" onclick="exitSystem()">🚪 Salir</button>
+<button id="btn-reset" onclick="resetFlow()">🔄 Reiniciar</button>
+</div>
+
+<div id="output-area">Esperando activación...</div>
+
+</div>
+
+<script>
+const synth = window.speechSynthesis;
+const inputArea = document.getElementById("input-area");
+const outputArea = document.getElementById("output-area");
+
+let modoSistema=false;
+let etapa="";
+let microSeleccionado="";
+
+// ================= VOZ =================
+function speak(text){
+  synth.cancel();
+  const utterance=new SpeechSynthesisUtterance(text);
+  utterance.lang="es-ES";
+  outputArea.innerHTML="🔊 "+text;
+  synth.speak(utterance);
+}
+
+function stopSpeech(){
+  synth.cancel();
+}
+
+// ================= CONTROL =================
+function exitSystem(){
+  modoSistema=false;
+  etapa="";
+  microSeleccionado="";
+  speak("Sistema desactivado.");
+}
+
+function resetFlow(){
+  if(modoSistema){
+    etapa="menuPrincipal";
+    speak("Flujo reiniciado. Di equipo a utilizar, funcionalidades o diferencias.");
+  }
+}
+
+// ================= PROCESAMIENTO =================
+function processText(){
+  const text=inputArea.value.trim();
+  if(!text) return;
+  processCommand(text);
+}
+
+function processCommand(text){
+  const lower=text.toLowerCase();
+
+  if(lower.includes("sistema") && !modoSistema){
+    modoSistema=true;
+    etapa="menuPrincipal";
+    speak("Sistema activado. Di equipo a utilizar, funcionalidades o diferencias.");
+    return;
+  }
+
+  if(!modoSistema){
+    speak(text);
+    return;
+  }
+
+  // MENÚ PRINCIPAL
+  if(etapa==="menuPrincipal"){
+    if(lower.includes("equipo")){
+      etapa="equipo";
+      speak("Di Romeo para STM32F446RE o Zeta para STM32F446ZE.");
+    }
+    else if(lower.includes("funcional")){
+      speak("Permite configurar DAC, ADC, SPI e I2C, además de control de pines y reloj.");
+    }
+    else if(lower.includes("diferencia")){
+      speak("La versión ZE posee mayor número de pines y mayor capacidad de memoria.");
+    }
+    else{
+      speak("Opción no válida. Di equipo a utilizar, funcionalidades o diferencias.");
+    }
+    return;
+  }
+
+  // SELECCIÓN DE MICRO
+  if(etapa==="equipo"){
+
+    if(lower.includes("romeo") || lower.includes("re")){
+      microSeleccionado="STM32F446RE";
+      etapa="interfaz";
+      speak("Seleccionaste STM32F446RE. Di interfaz.");
+    }
+
+    else if(lower.includes("zeta") || lower.includes("ze")){
+      microSeleccionado="STM32F446ZE";
+      etapa="interfaz";
+      speak("Seleccionaste STM32F446ZE. Di interfaz.");
+    }
+
+    else{
+      speak("Opción inválida. Di Romeo o Zeta.");
+    }
+
+    return;
+  }
+
+  // INTERFAZ
+  if(etapa==="interfaz" && lower.includes("interfaz")){
+    etapa="tipoInterfaz";
+    speak("Elige DAC, ADC, SPI o I2C.");
+    return;
+  }
+
+  if(etapa==="tipoInterfaz"){
+    if(lower.includes("dac")){
+      etapa="detalle";
+      speak("DAC convierte señal digital a analógica.");
+    }
+    else if(lower.includes("adc")){
+      etapa="detalle";
+      speak("ADC convierte señal analógica a digital con resolución de 12 bits.");
+    }
+    else if(lower.includes("spi")){
+      etapa="detalle";
+      speak("SPI permite comunicación serial síncrona de alta velocidad.");
+    }
+    else if(lower.includes("i2c")){
+      etapa="detalle";
+      speak("I2C permite comunicación maestro esclavo con dos líneas.");
+    }
+    else{
+      speak("Interfaz no válida.");
+    }
+    return;
+  }
+
+  if(etapa==="detalle"){
+    if(lower.includes("medio") || lower.includes("pin")){
+      speak("Los pines dependen del encapsulado del "+microSeleccionado+".");
+    }
+    else if(lower.includes("configuracion")){
+      speak("La configuración se realiza habilitando RCC y configurando registros.");
+    }
+    else if(lower.includes("regresar")){
+      etapa="menuPrincipal";
+      speak("Regresando al menú principal.");
+    }
+    else{
+      speak("Di medios, configuración o regresar.");
+    }
+    return;
+  }
+}
+
+// ================= MICRÓFONO MEJORADO =================
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if(SpeechRecognition){
+
+  const recognition=new SpeechRecognition();
+  recognition.lang="es-ES";
+  recognition.continuous=false;
+  recognition.interimResults=false;
+
+  recognition.onstart=function(){
+    outputArea.innerHTML="🎤 Escuchando...";
+  };
+
+  recognition.onresult=function(event){
+    const text=event.results[0][0].transcript;
+    inputArea.value=text;
+    processCommand(text);
+  };
+
+  recognition.onerror=function(event){
+    outputArea.innerHTML="❌ Error: "+event.error;
+  };
+
+  recognition.onend=function(){
+    outputArea.innerHTML+="<br>🔇 Micrófono detenido.";
+  };
+
+  window.startListening=function(){
+    recognition.start();
+  };
+
+}else{
+  alert("Usa Google Chrome para reconocimiento de voz.");
+}
+</script>
+
+</body>
+</html>
