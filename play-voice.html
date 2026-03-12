@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Texto a Voz</title>
+  <style>
+    body { font-family: Arial, sans-serif; 
+      max-width: 600px; 
+      margin: 40px auto; 
+      padding: 20px; background: #f0f4f8; }
+    h2 { text-align: center; color: #333; }
+    textarea { 
+      width: 100%; 
+      height: 150px; 
+      padding: 12px; 
+      font-size: 16px; 
+      border: 2px solid #ccc; 
+      border-radius: 8px; 
+      resize: vertical; 
+      box-sizing: border-box; }
+    
+    /* Panel de configuración */
+    #config-panel { background: #fff; 
+      padding: 15px; 
+      border-radius: 8px;
+       margin-top: 15px; 
+       border: 1px solid #ddd; }
+    .controls { 
+      display: flex; 
+      gap: 10px; margin-top: 10px; 
+      flex-wrap: wrap; }
+
+    label { 
+      font-size: 14px; 
+      color: #555; }
+
+    select, input[type="range"] { 
+      width: 100%; 
+      margin-top: 5px; }
+
+    .buttons {
+       display: flex; 
+       gap: 10px; 
+       margin-top: 20px; 
+       flex-wrap: wrap; }
+
+    button { flex: 1; 
+      padding: 12px; 
+      font-size: 16px; 
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      transition: background 0.2s; 
+      font-weight: bold; }
+    
+    #btn-speak  { background: #4CAF50; color: white; }
+    #btn-listen { background: #9C27B0; color: white; }
+    #btn-pause  { background: #2196F3; color: white; }
+    #btn-stop   { background: #f44336; color: white; }
+    #btn-save   { background: #607D8B; color: white; width: 100%; margin-top: 10px; }
+    
+    button:hover { opacity: 0.85; }
+    .hidden { display: none !important; }
+    
+    #output-area { margin-top: 15px; 
+      padding: 10px; 
+      background: #fff; 
+      border-radius: 8px; 
+      color: #444; 
+      min-height: 40px; 
+      border: 1px solid #ddd;
+       text-align: center; 
+      }
+
+    #btn-reset { display: block; 
+      margin: 10px auto; 
+      background: none; 
+      color: #888; 
+      text-decoration: underline; 
+      border: none; 
+      cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <h2>🔊 Texto a voz</h2>
+
+  <textarea id="input-area" placeholder="Escribe aquí el texto que quieres escuchar..."></textarea>
+
+  <div id="config-panel">
+    <div class="controls">
+      <div style="flex:2">
+        <label>🌐 Idioma / Voz:
+          <select id="voice-select"></select>
+        </label>
+      </div>
+      <div style="flex:1">
+        <label>🐢 Velocidad: <span id="rate-val">1</span>
+          <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+        </label>
+      </div>
+      <div style="flex:1">
+        <label>🎵 Tono: <span id="pitch-val">1</span>
+          <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1">
+        </label>
+      </div>
+    </div>
+    <button id="btn-save" onclick="saveConfiguration()">💾 Guardar Configuración</button>
+  </div>
+
+  <div class="buttons">
+    <button id="btn-speak" onclick="play()">▶ Reproducir</button>
+    <button id="btn-pause" onclick="togglePause()">⏸ Pausar</button>
+    <button id="btn-stop"  onclick="stopSpeech()">⏹ Detener</button>
+    <button id="btn-listen" onclick="listen()">🎤 Escuchar</button>
+  </div>
+
+  <div id="output-area">Esperando configuración...</div>
+  <button id="btn-reset" class="hidden" onclick="reset()">Modificar ajustes (Voz, Vel, Tono)</button>
+
+  <script>
+    const synth = window.speechSynthesis;
+    const voiceSelect = document.getElementById('voice-select');
+    const outputArea = document.getElementById('output-area');
+    const inputArea = document.getElementById('input-area');
+    const rateInput  = document.getElementById('rate');
+    const pitchInput = document.getElementById('pitch');
+    const configPanel = document.getElementById('config-panel');
+    const btnReset = document.getElementById('btn-reset');
+    
+    let voices = [];
+    let savedConfig = null;
+
+    // Cargar voces disponibles
+    function loadVoices() {
+      voices = synth.getVoices();
+      voiceSelect.innerHTML = '';
+      voices.forEach((voice, i) => {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+      });
+    }
+    
+    // Las voces pueden cargarse de forma asíncrona
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    // Actualizar etiquetas de sliders
+    rateInput.oninput = () => document.getElementById('rate-val').textContent = rateInput.value;
+    pitchInput.oninput = () => document.getElementById('pitch-val').textContent = pitchInput.value;
+
+    function saveConfiguration() {
+      const config = {
+        voiceName: voiceSelect.value,
+        rate: rateInput.value,
+        pitch: pitchInput.value
+      };
+      localStorage.setItem('nui_final_config', JSON.stringify(config));
+      applyConfigUI(config);
+      outputArea.innerHTML = '✅ Configuración guardada.';
+    }
+
+    function applyConfigUI(config) {
+      savedConfig = config;
+      configPanel.classList.add('hidden');
+      btnReset.classList.remove('hidden');
+      outputArea.innerHTML = '⚙️ Configuración cargada.';
+    }
+
+    function reset() {
+      localStorage.removeItem('nui_final_config');
+      savedConfig = null;
+      configPanel.classList.remove('hidden');
+      btnReset.classList.add('hidden');
+    }
+
+    
+    function speak(text) {
+      if (!savedConfig) {
+        outputArea.innerHTML = '⚠️ Guarda la configuración primero.';
+        return;
+      }
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voices.find(v => v.name === savedConfig.voiceName);
+      utterance.rate = parseFloat(savedConfig.rate);
+      utterance.pitch = parseFloat(savedConfig.pitch);
+
+      utterance.onstart = () => outputArea.innerHTML = '🔊 Reproduciendo...';
+      utterance.onend = () => outputArea.innerHTML = '✅ Lectura completada.';
+      synth.speak(utterance);
+    }
+
+    function play() {
+      const text = inputArea.value.trim();
+      if (text) speak(text);
+      else outputArea.innerHTML = '⚠️ Escribe algún texto primero.';
+    }
+
+    
+
+    function listen() {
+      
+    
+      if (!('webkitSpeechRecognition' in window)) {
+        outputArea.innerHTML = "❌ Navegador no compatible con voz.";
+        return;
+      }
+
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "es-MX";
+      recognition.start();
+
+      recognition.onstart = () => outputArea.innerHTML = "🎤 Escuchando...";
+      
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        
+        if (transcript.includes("hora")) {
+          const ahora = new Date();
+          const respuesta = `Son las ${ahora.getHours()} con ${ahora.getMinutes()} minutos.`;
+          speak(respuesta);
+        } else if (transcript.includes("hola")) {
+          speak("Hola, ¿Puedo ayudarte en algo?");
+        } else {
+          outputArea.innerHTML = `Escuché: "${transcript}"`;
+          speak("No reconozco ese comando.");
+        }
+      };
+      recognition.onerror = () => outputArea.innerHTML = "❌ Error al capturar audio.";
+    }
+
+    function togglePause() {
+      if (synth.paused) { synth.resume(); outputArea.innerHTML = '🔊 Reproduciendo...'; }
+      else if (synth.speaking) { synth.pause(); outputArea.innerHTML = '⏸ Pausado.'; }
+    }
+
+    function stopSpeech() {
+      synth.cancel();
+      outputArea.innerHTML = '❌ Error: interrupted ';
+    }
+  </script>
+</body>
+</html>
